@@ -4,8 +4,9 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-
 dotenv.config();
+
+import router from './routes';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +29,9 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true })
 // ── Parsing ───────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api', router);
  
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
