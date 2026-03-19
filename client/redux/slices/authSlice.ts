@@ -58,21 +58,20 @@ export const refreshThunk = createAsyncThunk<{ accessToken: string }, void, { re
   }
 );
 
-export const meThunk = createAsyncThunk<
-  { user: User; permissions: { atom: string }[] },
-  { token?: string } | void,
-  { rejectValue: string; state: RootState }
->("auth/me", async (payload, { rejectWithValue, dispatch, getState }) => {
-  try {
-    const token = (payload as any)?.token ?? getState().auth.accessToken;
-    const res = await api.get("/auth/me", token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-    const { user, permissions } = res.data as { user: User; permissions: { atom: string }[] };
-    dispatch(setPermissions(permissions.map((p) => p.atom)));
-    return { user, permissions };
-  } catch (err: any) {
-    return rejectWithValue(err?.response?.data?.message ?? "Failed to load session");
+export const meThunk = createAsyncThunk(
+  "auth/me", 
+  async (_, { rejectWithValue, dispatch }) => {
+    try {
+      // Axios withCredentials: true handles the cookie automatically!
+      const res = await api.get("/auth/me"); 
+      const { user, permissions } = res.data;
+      dispatch(setPermissions(permissions.map((p: any) => p.atom)));
+      return { user, permissions };
+    } catch (err: any) {
+      return rejectWithValue(err?.response?.data?.message ?? "Session expired");
+    }
   }
-});
+);
 
 export const logoutThunk = createAsyncThunk<void, void, { rejectValue: string; state: RootState }>(
   "auth/logout",

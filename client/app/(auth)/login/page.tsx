@@ -21,8 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     const res = await dispatch(loginThunk({ email, password }));
     if (res.meta.requestStatus === "fulfilled") {
-      const token = (res.payload as any).accessToken as string;
-      await dispatch(meThunk({ token }));
+      await dispatch(meThunk());
       router.replace("/dashboard");
     }
   }

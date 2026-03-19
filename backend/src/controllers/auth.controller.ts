@@ -9,13 +9,26 @@ import {
 } from '../utils/jwt';
 import { auditLog } from '../services/audit.service';
 
+// --- Constants & Security Configuration ---
+const ACCESS_COOKIE = 'access_token';
 const REFRESH_COOKIE = 'refresh_token';
-const COOKIE_OPTIONS = {
-  httpOnly: true,
+
+const COMMON_COOKIE_OPTIONS = {
+  httpOnly: true, // Prevents XSS attacks
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
+  sameSite: 'lax' as const, // 'lax' is better for local dev with different ports
+  path: '/',
+};
+
+const ACCESS_COOKIE_OPTIONS = {
+  ...COMMON_COOKIE_OPTIONS,
+  maxAge: 15 * 60 * 1000, // 15 minutes
+};
+
+const REFRESH_COOKIE_OPTIONS = {
+  ...COMMON_COOKIE_OPTIONS,
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/api/auth',
+  path: '/api/auth', // Scoped only to auth routes for extra security
 };
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
@@ -31,7 +44,6 @@ export async function login(req: Request, res: Response) {
 
   const user = result.rows[0];
 
-  // Generic error to prevent user enumeration
   if (!user) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
@@ -40,15 +52,13 @@ export async function login(req: Request, res: Response) {
     return res.status(403).json({ message: 'Account banned' });
   }
 
-  // Brute-force lockout check
   if (user.locked_until && new Date(user.locked_until) > new Date()) {
-    return res.status(429).json({ message: 'Account temporarily locked. Try again later.' });
+    return res.status(429).json({ message: 'Account temporarily locked.' });
   }
 
   const valid = await bcrypt.compare(password, user.password_hash);
 
   if (!valid) {
-    // Increment failed attempts; lock after 5
     const attempts = user.failed_login_attempts + 1;
     const lockUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
 
@@ -61,20 +71,13 @@ export async function login(req: Request, res: Response) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
-  if (user.status === 'suspended') {
-    return res.status(403).json({ message: 'Account suspended' });
-  }
-
-  // Reset failed attempts on success
-  await query(
-    `UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1`,
-    [user.id]
-  );
+  // Reset failed attempts
+  await query(`UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1`, [user.id]);
 
   const accessToken = generateAccessToken({ sub: user.id, email: user.email, role: user.role });
-  const { token: refreshToken, jti: refreshJti } = generateRefreshToken(user.id);
+  const { token: refreshToken } = generateRefreshToken(user.id);
 
-  // Store hashed refresh token
+  // Store hashed refresh token in DB
   const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await query(
     `UPDATE users SET refresh_token_hash = $1, refresh_token_expires_at = $2 WHERE id = $3`,
@@ -83,9 +86,12 @@ export async function login(req: Request, res: Response) {
 
   await auditLog({ actorId: user.id, targetId: user.id, action: 'auth.login', req });
 
-  res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
+  // Set Cookies
+  res.cookie(ACCESS_COOKIE, accessToken, ACCESS_COOKIE_OPTIONS);
+  res.cookie(REFRESH_COOKIE, refreshToken, REFRESH_COOKIE_OPTIONS);
+
   return res.json({
-    accessToken,
+    accessToken, // Still return for Redux, but Cookie is the primary backup
     user: {
       id: user.id,
       email: user.email,
@@ -121,60 +127,64 @@ export async function refresh(req: Request, res: Response) {
     return res.status(401).json({ message: 'User inactive' });
   }
 
+  // Validate stored hash
   if (
     !user.refresh_token_hash ||
     user.refresh_token_hash !== hashToken(refreshToken) ||
     new Date(user.refresh_token_expires_at) < new Date()
   ) {
-    return res.status(401).json({ message: 'Refresh token invalid or expired' });
+    return res.status(401).json({ message: 'Refresh token invalid' });
   }
 
-  // Rotate refresh token
+  // Rotate Tokens (Security Best Practice)
+  const newAccessToken = generateAccessToken({ sub: user.id, email: user.email, role: user.role });
   const { token: newRefreshToken } = generateRefreshToken(user.id);
-  const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
+  
   await query(
     `UPDATE users SET refresh_token_hash = $1, refresh_token_expires_at = $2 WHERE id = $3`,
-    [hashToken(newRefreshToken), newExpiry, user.id]
+    [hashToken(newRefreshToken), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), user.id]
   );
 
-  const newAccessToken = generateAccessToken({ sub: user.id, email: user.email, role: user.role });
+  res.cookie(ACCESS_COOKIE, newAccessToken, ACCESS_COOKIE_OPTIONS);
+  res.cookie(REFRESH_COOKIE, newRefreshToken, REFRESH_COOKIE_OPTIONS);
 
-  res.cookie(REFRESH_COOKIE, newRefreshToken, COOKIE_OPTIONS);
   return res.json({ accessToken: newAccessToken });
 }
 
 // ── POST /api/auth/logout ─────────────────────────────────────────────────────
 export async function logout(req: Request, res: Response) {
+  // 1. Blacklist current Access Token if possible
   const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : req.cookies?.[ACCESS_COOKIE];
+
+  if (token) {
     try {
-      // Import inline to avoid circular
       const { verifyAccessToken } = await import('../utils/jwt');
       const { jti } = verifyAccessToken(token);
-      // Blacklist the current access token JTI until it naturally expires
       await query(
-        `INSERT INTO session_blacklist (jti, expires_at) VALUES ($1, NOW() + INTERVAL '15 minutes')
+        `INSERT INTO session_blacklist (jti, expires_at) VALUES ($1, NOW() + INTERVAL '15 minutes') 
          ON CONFLICT DO NOTHING`,
         [jti]
       );
-    } catch { /* ignore invalid tokens at logout */ }
+    } catch { /* skip invalid token */ }
   }
 
-  // Clear refresh token from DB and cookie
+  // 2. Clear Database Record
   if (req.user) {
     await query(`UPDATE users SET refresh_token_hash = NULL, refresh_token_expires_at = NULL WHERE id = $1`, [req.user.id]);
     await auditLog({ actorId: req.user.id, targetId: req.user.id, action: 'auth.logout', req });
   }
 
+  // 3. Clear Browser Cookies
+  res.clearCookie(ACCESS_COOKIE, { path: '/' });
   res.clearCookie(REFRESH_COOKIE, { path: '/api/auth' });
-  return res.json({ message: 'Logged out' });
+
+  return res.json({ message: 'Logged out successfully' });
 }
 
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
 export async function me(req: Request, res: Response) {
-  const user = req.user!;
+  const user = req.user!; // Populated by authenticate middleware
 
   const permsResult = await query(
     `SELECT p.atom, p.label, p.module
