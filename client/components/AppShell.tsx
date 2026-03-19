@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logoutThunk } from "@/redux/slices/authSlice";
+import { logout } from "@/app/actions/auth";
 
 type NavItem = { href: string; label: string; atom: string };
 
@@ -21,6 +22,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const user = useAppSelector((s) => s.auth.user);
   const atoms = useAppSelector((s) => s.permissions.atoms);
   const allowed = new Set(atoms);
+  const router = useRouter();
+
+  const handleLogout = () => {
+    dispatch(logoutThunk());
+    logout();
+    router.push("/login");
+  };
 
   return (
     <div className="min-h-screen">
@@ -54,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
 
             <button
-              onClick={() => dispatch(logoutThunk())}
+              onClick={handleLogout}
               className="mt-6 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50"
             >
               Logout
