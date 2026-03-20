@@ -1,5 +1,4 @@
-// ── Audit Log Service ─────────────────────────────────────────────────────────
-import { Request } from 'express';
+import { Request,Response } from 'express';
 import { query } from '../db/pool';
 
 interface AuditOptions {
@@ -31,7 +30,6 @@ export async function auditLog({ actorId, targetId, action, metadata, req }: Aud
 }
 
 // ── GET /api/audit ─────────────────────────────────────────────────────────────
-import { Response } from 'express';
 
 export async function listAuditLogs(req: Request, res: Response) {
   const { page = '1', limit = '50', action, actor_id } = req.query;
