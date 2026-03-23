@@ -8,7 +8,7 @@ import {
   hashToken,
 } from '../utils/jwt';
 import { auditLog } from '../services/audit.service';
-
+import { User } from '../interfaces';
 // --- Constants & Security Configuration ---
 const ACCESS_COOKIE = 'access_token';
 const REFRESH_COOKIE = 'refresh_token';
@@ -184,7 +184,7 @@ export async function logout(req: Request, res: Response) {
 
 // ── GET /api/auth/me ──────────────────────────────────────────────────────────
 export async function me(req: Request, res: Response) {
-  const user = req.user!; // Populated by authenticate middleware
+  const user = req.user! as User; // Populated by authenticate middleware
 
   const permsResult = await query(
     `SELECT p.atom, p.label, p.module
