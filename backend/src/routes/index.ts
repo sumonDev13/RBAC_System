@@ -4,8 +4,15 @@ import { login, logout, refresh, me } from '../controllers/auth.controller';
 import { listUsers, createUser, getUser, updateUser, deleteUser } from '../controllers/users.controller';
 import { listPermissions, getUserPermissions, setUserPermissions } from '../controllers/permissions.controller';
 import { listAuditLogs } from '../services/audit.service';
+import { googleRedirect, googleCallback } from '../controllers/google_auth.controller';
 
 const router = Router();
+
+
+
+// ── Google OAuth ──────────────────────────────────────────────────────────────
+router.get('/auth/google',          googleRedirect);
+router.get('/auth/google/callback', googleCallback);
 
 // ── Auth (public) ─────────────────────────────────────────────────────────────
 router.post('/auth/login',   login);
