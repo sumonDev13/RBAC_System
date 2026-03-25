@@ -52,17 +52,21 @@ export function googleRedirect(req: Request, res: Response) {
 export async function googleCallback(req: Request, res: Response) {
   const { code, state } = req.query;
 
+  // Use OAUTH_REDIRECT_FRONTEND if set; otherwise use the first value of FRONTEND_URL
+  const frontendUrl = process.env.OAUTH_REDIRECT_FRONTEND
+    || (process.env.FRONTEND_URL ?? '').split(',')[0].trim();
+
   // ── 1. Validate state (CSRF protection) ──────────────────────────────────
   const storedState = req.cookies?.oauth_state;
   res.clearCookie('oauth_state', { path: '/' });
 
   if (!storedState || storedState !== state) {
     console.error('OAuth state mismatch — possible CSRF or replay');
-    return res.redirect(`${process.env.FRONTEND_URL}/login?error=google_failed`);
+    return res.redirect(`${frontendUrl}/login?error=google_failed`);
   }
 
   if (!code || typeof code !== 'string') {
-    return res.redirect(`${process.env.FRONTEND_URL}/login?error=google_failed`);
+    return res.redirect(`${frontendUrl}/login?error=google_failed`);
   }
 
   // ── 2. One-time code guard (prevents double-execution in dev/StrictMode) ──
@@ -90,7 +94,7 @@ export async function googleCallback(req: Request, res: Response) {
 
     const googlePayload = ticket.getPayload();
     if (!googlePayload?.email) {
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=google_no_email`);
+      return res.redirect(`${frontendUrl}/login?error=google_no_email`);
     }
 
     const { sub: googleId, email, given_name, family_name, picture } = googlePayload;
@@ -133,10 +137,10 @@ export async function googleCallback(req: Request, res: Response) {
     }
 
     if (user.status === 'banned') {
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_banned`);
+      return res.redirect(`${frontendUrl}/login?error=account_banned`);
     }
     if (user.status === 'suspended') {
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_suspended`);
+      return res.redirect(`${frontendUrl}/login?error=account_suspended`);
     }
 
     // ── 6. Issue your existing JWT cookies (identical to /auth/login) ───────
@@ -156,12 +160,11 @@ export async function googleCallback(req: Request, res: Response) {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
-    console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
-    console.log('Redirecting to:', `${process.env.FRONTEND_URL}/auth/callback?token=...`);
+    console.log('Redirecting to:', `${frontendUrl}/callback?token=...`);
 
     // Redirect to frontend callback page with token for Redux
     return res.redirect(
-      `${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}`
+      `${frontendUrl}/callback?token=${accessToken}`
     );
     
 
@@ -172,6 +175,8 @@ export async function googleCallback(req: Request, res: Response) {
       return res.status(200).send('');
     }
     console.error('Google OAuth error:', err);
-    return res.redirect(`${process.env.FRONTEND_URL}/login?error=google_failed`);
+    const frontendUrlFallback = process.env.OAUTH_REDIRECT_FRONTEND
+      || (process.env.FRONTEND_URL ?? '').split(',')[0].trim();
+    return res.redirect(`${frontendUrlFallback}/login?error=google_failed`);
   }
 }

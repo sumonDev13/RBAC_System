@@ -21,7 +21,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/robots.txt") ||
     pathname.startsWith("/sitemap") ||
     pathname.startsWith("/403") ||
-    pathname.startsWith("/login")
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/callback")
   ) {
     return NextResponse.next();
   }

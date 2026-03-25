@@ -38,11 +38,20 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    // The access token cookie is already set by the backend redirect.
+    // Set the accessToken cookie so Next.js middleware can read it
+    document.cookie = `accessToken=${encodeURIComponent(token)}; path=/; max-age=${15 * 60}`;
+
     // Dispatch meThunk to populate Redux state (it reads from the cookie).
     dispatch(meThunk())
       .unwrap()
-      .then(() => router.replace("/dashboard"))
+          .then((result: any) => {
+        const role = result?.user?.role;
+        if (role === "customer") {
+          router.replace("/customer-portal");
+        } else {
+          router.replace("/dashboard");
+        }
+      })
       .catch(() => router.replace("/login?error=session_failed"));
   }, []);
 

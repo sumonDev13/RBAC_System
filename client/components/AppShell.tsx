@@ -7,13 +7,14 @@ import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logoutThunk } from "@/redux/slices/authSlice";
 import { logout } from "@/app/actions/auth";
 
-type NavItem = { href: string; label: string; atom: string };
+type NavItem = { href: string; label: string; atom?: string; roles?: string[] };
 
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", atom: "dashboard.view" },
   { href: "/users", label: "Users", atom: "users.view" },
   { href: "/permissions", label: "Permissions", atom: "permissions.manage" },
   { href: "/audit", label: "Audit Log", atom: "audit.view" },
+  { href: "/customer-portal", label: "Customer Portal", roles: ["customer"] },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -47,7 +48,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <nav className="space-y-1">
-              {NAV.filter((i) => allowed.has(i.atom)).map((item) => (
+              {NAV.filter((i) => {
+                if (i.atom) return allowed.has(i.atom);
+                if (i.roles) return i.roles.includes(user?.role ?? "");
+                return true;
+              }).map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
