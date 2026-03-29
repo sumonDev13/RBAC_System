@@ -5,10 +5,14 @@ import { listUsers, createUser, getUser, updateUser, deleteUser } from '../contr
 import { listPermissions, getUserPermissions, setUserPermissions } from '../controllers/permissions.controller';
 import { listAuditLogs } from '../services/audit.service';
 import { googleRedirect, googleCallback } from '../controllers/google_auth.controller';
+import { facebookCallback, facebookRedirect } from '../controllers/facebook_auth.controller';
 
 const router = Router();
 
 
+// ── Facebook OAuth ────────────────────────────────────────────────────────────
+router.get('/auth/facebook',          facebookRedirect);
+router.get('/auth/facebook/callback', facebookCallback);
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 router.get('/auth/google',          googleRedirect);
