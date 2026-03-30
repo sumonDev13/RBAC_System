@@ -45,8 +45,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("Admin@1234");
 
   useEffect(() => {
-    if (auth.status === "authenticated") router.replace("/dashboard");
-  }, [auth.status, router]);
+    if (auth.status === "authenticated") {
+      const role = auth.user?.role;
+      if (role === "customer") {
+        router.replace("/customer-portal");
+      } else {
+        router.replace("/dashboard");
+      }
+    }
+  }, [auth.status, auth.user?.role, router]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -60,8 +67,13 @@ export default function LoginPage() {
     e.preventDefault();
     const res = await dispatch(loginThunk({ email, password }));
     if (res.meta.requestStatus === "fulfilled") {
-      await dispatch(meThunk());
-      router.replace("/dashboard");
+      const meRes = await dispatch(meThunk()).unwrap();
+      const role = meRes?.user?.role;
+      if (role === "customer") {
+        router.replace("/customer-portal");
+      } else {
+        router.replace("/dashboard");
+      }
     }
   }
 

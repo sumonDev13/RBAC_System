@@ -4,10 +4,10 @@ export default function ForbiddenPage() {
       <h1 className="text-3xl font-semibold">403</h1>
       <p className="text-zinc-600">You don’t have permission to access this page.</p>
       <a
-        href="/dashboard"
+        href="/login"
         className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
       >
-        Back to dashboard
+        Back to Login
       </a>
     </main>
   );
