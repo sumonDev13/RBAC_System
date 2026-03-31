@@ -19,15 +19,6 @@ type AuthState = {
   error: string | null;
 };
 
-function setAccessTokenCookie(token: string | null) {
-  if (typeof document === "undefined") return;
-  if (!token) {
-    document.cookie = "accessToken=; path=/; max-age=0";
-    return;
-  }
-  document.cookie = `accessToken=${encodeURIComponent(token)}; path=/; max-age=${15 * 60}`;
-}
-
 export const loginThunk = createAsyncThunk<
   { user: User; accessToken: string },
   { email: string; password: string },
@@ -36,7 +27,6 @@ export const loginThunk = createAsyncThunk<
   try {
     const res = await api.post("/auth/login", payload);
     const { accessToken, user } = res.data as { accessToken: string; user: User };
-    setAccessTokenCookie(accessToken);
     return { user, accessToken };
   } catch (err: any) {
     return rejectWithValue(err?.response?.data?.message ?? "Login failed");
@@ -49,21 +39,18 @@ export const refreshThunk = createAsyncThunk<{ accessToken: string }, void, { re
     try {
       const res = await api.post("/auth/refresh");
       const { accessToken } = res.data as { accessToken: string };
-      setAccessTokenCookie(accessToken);
       return { accessToken };
     } catch (err: any) {
-      setAccessTokenCookie(null);
       return rejectWithValue(err?.response?.data?.message ?? "Refresh failed");
     }
   }
 );
 
 export const meThunk = createAsyncThunk(
-  "auth/me", 
+  "auth/me",
   async (_, { rejectWithValue, dispatch }) => {
     try {
-      // Axios withCredentials: true handles the cookie automatically!
-      const res = await api.get("/auth/me"); 
+      const res = await api.get("/auth/me");
       const { user, permissions } = res.data;
       dispatch(setPermissions(permissions.map((p: any) => p.atom)));
       return { user, permissions };
@@ -75,15 +62,11 @@ export const meThunk = createAsyncThunk(
 
 export const logoutThunk = createAsyncThunk<void, void, { rejectValue: string; state: RootState }>(
   "auth/logout",
-  async (_payload, { rejectWithValue, getState, dispatch }) => {
+  async (_payload, { rejectWithValue, getState }) => {
     try {
       const token = getState().auth.accessToken;
       await api.post("/auth/logout", {}, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-      setAccessTokenCookie(null);
-      dispatch(clearPermissions());
     } catch (err: any) {
-      setAccessTokenCookie(null);
-      dispatch(clearPermissions());
       return rejectWithValue(err?.response?.data?.message ?? "Logout failed");
     }
   }
@@ -105,14 +88,12 @@ const authSlice = createSlice({
       state.accessToken = action.payload.token;
       state.status = "authenticated";
       state.error = null;
-      setAccessTokenCookie(action.payload.token);
     },
     clearAuth(state) {
       state.user = null;
       state.accessToken = null;
       state.status = "idle";
       state.error = null;
-      setAccessTokenCookie(null);
     },
   },
   extraReducers: (builder) => {
@@ -133,7 +114,6 @@ const authSlice = createSlice({
       })
       .addCase(refreshThunk.fulfilled, (state, action) => {
         state.accessToken = action.payload.accessToken;
-        if (state.status === "idle") state.status = "loading";
       })
       .addCase(refreshThunk.rejected, (state) => {
         state.user = null;
@@ -151,6 +131,13 @@ const authSlice = createSlice({
         state.status = "idle";
       })
       .addCase(logoutThunk.fulfilled, (state) => {
+        state.user = null;
+        state.accessToken = null;
+        state.status = "idle";
+        state.error = null;
+      })
+      .addCase(logoutThunk.rejected, (state) => {
+        // Clear state even on error
         state.user = null;
         state.accessToken = null;
         state.status = "idle";

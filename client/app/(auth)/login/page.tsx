@@ -41,8 +41,8 @@ export default function LoginPage() {
   const dispatch = useAppDispatch();
   const auth = useAppSelector((s) => s.auth);
 
-  const [email, setEmail] = useState("admin@example.com");
-  const [password, setPassword] = useState("Admin@1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     if (auth.status === "authenticated") {

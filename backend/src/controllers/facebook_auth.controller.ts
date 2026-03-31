@@ -3,20 +3,12 @@ import crypto from 'crypto';
 import { query } from '../db/pool';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/jwt';
 import { auditLog } from '../services/audit.service';
+import { ACCESS_COOKIE, REFRESH_COOKIE, COMMON_COOKIE_OPTIONS } from '../config/cookies';
+import { createPendingAuth } from '../utils/pendingAuth';
 
 const FB_APP_ID     = process.env.FACEBOOK_APP_ID     ?? '';
 const FB_APP_SECRET = process.env.FACEBOOK_APP_SECRET ?? '';
 const FB_REDIRECT   = process.env.FACEBOOK_REDIRECT_URI ?? '';
-
-const ACCESS_COOKIE  = 'access_token';
-const REFRESH_COOKIE = 'refresh_token';
-
-const COMMON_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-};
 
 // In-memory used-codes guard (prevents double-execution in dev / StrictMode)
 const usedCodes = new Set<string>();
@@ -205,8 +197,8 @@ export async function facebookCallback(req: Request, res: Response) {
       path: '/api/auth',
     });
 
-    console.log('Facebook OAuth: redirecting to callback');
-    return res.redirect(`${frontendUrl}/callback?token=${accessToken}`);
+    const pendingToken = createPendingAuth(accessToken);
+    return res.redirect(`${frontendUrl}/callback?token=${pendingToken}`);
 
   } catch (err: any) {
     console.error('Facebook OAuth error:', err);

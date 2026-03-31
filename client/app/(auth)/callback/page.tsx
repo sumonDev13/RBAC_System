@@ -3,12 +3,14 @@
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppDispatch } from "@/redux/hooks";
-import { meThunk } from "@/redux/slices/authSlice";
+import { setAuth, meThunk } from "@/redux/slices/authSlice";
+import api from "@/lib/axios";
 
-// Map backend error codes to user-friendly messages
 const ERROR_MESSAGES: Record<string, string> = {
   google_failed:      "Google sign-in failed. Please try again.",
   google_no_email:    "Your Google account has no verified email.",
+  facebook_failed:    "Facebook sign-in failed. Please try again.",
+  facebook_no_profile: "Could not retrieve your Facebook profile.",
   account_banned:     "Your account has been banned.",
   account_suspended:  "Your account is suspended.",
   session_failed:     "Session could not be established. Please try again.",
@@ -18,7 +20,7 @@ export default function AuthCallbackPage() {
   const router      = useRouter();
   const searchParams = useSearchParams();
   const dispatch    = useAppDispatch();
-  const ran         = useRef(false); // prevent double-fire in React StrictMode
+  const ran         = useRef(false);
 
   useEffect(() => {
     if (ran.current) return;
@@ -26,6 +28,11 @@ export default function AuthCallbackPage() {
 
     const token = searchParams.get("token");
     const error = searchParams.get("error");
+
+    // Clear the token from URL immediately
+    if (token) {
+      window.history.replaceState(null, "", "/callback");
+    }
 
     if (error) {
       const msg = ERROR_MESSAGES[error] ?? "Something went wrong during sign-in.";
@@ -38,14 +45,19 @@ export default function AuthCallbackPage() {
       return;
     }
 
-    // Set the accessToken cookie so Next.js middleware can read it
-    document.cookie = `accessToken=${encodeURIComponent(token)}; path=/; max-age=${15 * 60}`;
+    // Exchange the one-time pending token for the actual JWT + user data
+    api.post("/auth/exchange", { token })
+      .then((res) => {
+        const { accessToken, user, permissions } = res.data;
+        dispatch(setAuth({ user, token: accessToken }));
+        // Store permissions in Redux
+        if (permissions) {
+          import("@/redux/slices/permissionSlice").then(({ setPermissions }) => {
+            dispatch(setPermissions(permissions.map((p: any) => p.atom)));
+          });
+        }
 
-    // Dispatch meThunk to populate Redux state (it reads from the cookie).
-    dispatch(meThunk())
-      .unwrap()
-          .then((result: any) => {
-        const role = result?.user?.role;
+        const role = user?.role;
         if (role === "customer") {
           router.replace("/customer-portal");
         } else {

@@ -4,22 +4,14 @@ import crypto from 'crypto';
 import { query } from '../db/pool';
 import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/jwt';
 import { auditLog } from '../services/audit.service';
+import { ACCESS_COOKIE, REFRESH_COOKIE, COMMON_COOKIE_OPTIONS } from '../config/cookies';
+import { createPendingAuth } from '../utils/pendingAuth';
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI
 );
-
-const ACCESS_COOKIE  = 'access_token';
-const REFRESH_COOKIE = 'refresh_token';
-
-const COMMON_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-};
 
 // In-memory used-codes set (use Redis in production)
 const usedCodes = new Set<string>();
@@ -160,12 +152,10 @@ export async function googleCallback(req: Request, res: Response) {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/api/auth',
     });
-    console.log('Redirecting to:', `${frontendUrl}/callback?token=...`);
 
-    // Redirect to frontend callback page with token for Redux
-    return res.redirect(
-      `${frontendUrl}/callback?token=${accessToken}`
-    );
+    // Use a one-time token for the callback redirect (secure, not the actual JWT)
+    const pendingToken = createPendingAuth(accessToken);
+    return res.redirect(`${frontendUrl}/callback?token=${pendingToken}`);
     
 
   } catch (err: any) {

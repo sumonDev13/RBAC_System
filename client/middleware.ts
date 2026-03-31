@@ -27,7 +27,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = req.cookies.get("accessToken")?.value;
+  const token = req.cookies.get("access_token")?.value;
   if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
@@ -46,7 +46,9 @@ export async function middleware(req: NextRequest) {
     });
 
     if (!res.ok) {
-      return NextResponse.redirect(new URL("/login", req.url));
+      const response = NextResponse.redirect(new URL("/login", req.url));
+      response.cookies.delete("access_token");
+      return response;
     }
 
     const data = (await res.json()) as { permissions: { atom: string }[] };
@@ -57,11 +59,12 @@ export async function middleware(req: NextRequest) {
 
     return NextResponse.next();
   } catch {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const response = NextResponse.redirect(new URL("/login", req.url));
+    response.cookies.delete("access_token");
+    return response;
   }
 }
 
 export const config = {
   matcher: ["/((?!api).*)"],
 };
-

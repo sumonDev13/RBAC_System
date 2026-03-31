@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../db/pool';
 import { auditLog } from '../services/audit.service';
+import { validatePassword } from '../utils/password';
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
 export async function listUsers(req: Request, res: Response) {
@@ -54,6 +55,11 @@ export async function createUser(req: Request, res: Response) {
   const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) {
     return res.status(409).json({ message: 'Email already in use' });
+  }
+
+  const pwValidation = validatePassword(password);
+  if (!pwValidation.valid) {
+    return res.status(400).json({ message: 'Weak password', errors: pwValidation.errors });
   }
 
   const password_hash = await bcrypt.hash(password, 12);

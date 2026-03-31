@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logoutThunk } from "@/redux/slices/authSlice";
-import { logout } from "@/app/actions/auth";
 
 type NavItem = { href: string; label: string; atom?: string; roles?: string[] };
 
@@ -25,9 +24,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowed = new Set(atoms);
   const router = useRouter();
 
-  const handleLogout = () => {
-    dispatch(logoutThunk());
-    logout();
+  const handleLogout = async () => {
+    await dispatch(logoutThunk());
     router.push("/login");
   };
 
