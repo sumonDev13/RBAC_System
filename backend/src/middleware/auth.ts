@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import { query } from '../db/pool';
 import { ACCESS_COOKIE } from '../config/cookies';
+import { getResolvedPermissions } from '../services/permission.service';
 
 // ── Verify JWT and attach user + resolved permissions to req ──────────────────
 export async function authenticate(req: Request, res: Response, next: NextFunction) {
@@ -19,7 +20,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     const blacklisted = await query(
       'SELECT 1 FROM session_blacklist WHERE jti = $1 AND expires_at > NOW()',
-      [payload.jti]
+      [payload.jti],
     );
 
     if (blacklisted.rows.length > 0) {
@@ -29,7 +30,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     const userResult = await query(
       `SELECT id, email, first_name, last_name, role, status
        FROM users WHERE id = $1 AND status = 'active'`,
-      [payload.sub]
+      [payload.sub],
     );
 
     if (userResult.rows.length === 0) {
@@ -38,15 +39,8 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     req.user = userResult.rows[0];
 
-    const permsResult = await query<{ atom: string }>(
-      `SELECT p.atom
-       FROM resolved_user_permissions rp
-       JOIN permissions p ON p.id = rp.permission_id
-       WHERE rp.user_id = $1 AND rp.granted = true`,
-      [payload.sub]
-    );
-
-    req.userPermissions = permsResult.rows.map((r) => r.atom);
+    // Use cached permission resolution instead of hitting DB every time
+    req.userPermissions = await getResolvedPermissions(payload.sub);
 
     next();
   } catch {
