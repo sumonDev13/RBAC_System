@@ -13,6 +13,8 @@ const NAV: NavItem[] = [
   { href: "/users", label: "Users", atom: "users.view" },
   { href: "/permissions", label: "Permissions", atom: "permissions.manage" },
   { href: "/audit", label: "Audit Log", atom: "audit.view" },
+  { href: "/gallery", label: "My Gallery" },
+  { href: "/admin-gallery", label: "All Photos", roles: ["admin"] },
   { href: "/agent", label: "AI Agent", roles: ["admin"] },
   { href: "/customer-portal", label: "Customer Portal", roles: ["customer"] },
 ];

@@ -4,6 +4,7 @@ import permissionsReducer from "@/redux/slices/permissionSlice";
 import usersReducer from "@/redux/slices/usersSlice";
 import auditReducer from "@/redux/slices/auditSlice";
 import agentReducer from "@/redux/slices/agentSlice";
+import photosReducer from "@/redux/slices/photosSlice";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     users: usersReducer,
     audit: auditReducer,
     agent: agentReducer,
+    photos: photosReducer,
   },
 });
 
