@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requirePermission, requireRole } from '../middleware/auth';
-import { login, logout, refresh, me, exchange, verifyEmail } from '../controllers/auth.controller';
+import { login, logout, refresh, me, exchange, verifyEmail, resendVerification } from '../controllers/auth.controller';
 import { listUsers, createUser, getUser, updateUser, deleteUser } from '../controllers/users.controller';
 import { listPermissions, getUserPermissions, setUserPermissions } from '../controllers/permissions.controller';
 import { listAuditLogs } from '../services/audit.service';
@@ -23,6 +23,7 @@ router.post('/auth/login',   authRateLimiter, login);
 router.post('/auth/refresh', refresh);
 router.post('/auth/exchange', authRateLimiter, exchange);
 router.get('/auth/verify-email', verifyEmail);
+router.post('/auth/resend-verification', authRateLimiter, resendVerification);
 router.post('/auth/logout',  authenticate, logout);
 router.get('/auth/me',       authenticate, me);
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { query } from '../db/pool';
 import { auditLog } from '../services/audit.service';
 import { validatePassword } from '../utils/password';
+import { sendVerificationEmail } from '../services/emailVerification.service';
 
 // ── GET /api/users ────────────────────────────────────────────────────────────
 export async function listUsers(req: Request, res: Response) {
@@ -74,6 +75,9 @@ export async function createUser(req: Request, res: Response) {
 
   const newUser = result.rows[0];
   await auditLog({ actorId: actor.id, targetId: newUser.id, action: 'user.created', req });
+
+  // Send verification email (logs link in dev)
+  await sendVerificationEmail(newUser.id, newUser.email);
 
   return res.status(201).json({ user: newUser });
 }

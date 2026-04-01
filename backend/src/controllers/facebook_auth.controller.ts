@@ -5,6 +5,7 @@ import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/j
 import { auditLog } from '../services/audit.service';
 import { ACCESS_COOKIE, REFRESH_COOKIE, COMMON_COOKIE_OPTIONS } from '../config/cookies';
 import { createPendingAuth } from '../utils/pendingAuth';
+import { sendVerificationEmail } from '../services/emailVerification.service';
 
 const FB_APP_ID     = process.env.FACEBOOK_APP_ID     ?? '';
 const FB_APP_SECRET = process.env.FACEBOOK_APP_SECRET ?? '';
@@ -148,6 +149,7 @@ export async function facebookCallback(req: Request, res: Response) {
         );
         user = result.rows[0];
         await auditLog({ actorId: user.id, targetId: user.id, action: 'user.created_via_facebook', req });
+        if (user.email) await sendVerificationEmail(user.id, user.email);
       }
     } else {
       // Facebook account has no email — create with a placeholder

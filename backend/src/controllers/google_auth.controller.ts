@@ -6,6 +6,7 @@ import { generateAccessToken, generateRefreshToken, hashToken } from '../utils/j
 import { auditLog } from '../services/audit.service';
 import { ACCESS_COOKIE, REFRESH_COOKIE, COMMON_COOKIE_OPTIONS } from '../config/cookies';
 import { createPendingAuth } from '../utils/pendingAuth';
+import { sendVerificationEmail } from '../services/emailVerification.service';
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -125,6 +126,7 @@ export async function googleCallback(req: Request, res: Response) {
         );
         user = result.rows[0];
         await auditLog({ actorId: user.id, targetId: user.id, action: 'user.created_via_google', req });
+        await sendVerificationEmail(user.id, user.email);
       }
     }
 

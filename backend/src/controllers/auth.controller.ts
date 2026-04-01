@@ -16,7 +16,7 @@ import {
   REFRESH_COOKIE_OPTIONS,
 } from '../config/cookies';
 import { consumePendingAuth } from '../utils/pendingAuth';
-import { verifyEmailToken } from '../services/emailVerification.service';
+import { verifyEmailToken, sendVerificationEmail } from '../services/emailVerification.service';
 
 // ── POST /api/auth/login ──────────────────────────────────────────────────────
 export async function login(req: Request, res: Response) {
@@ -24,7 +24,7 @@ export async function login(req: Request, res: Response) {
 
   const result = await query(
     `SELECT id, email, password_hash, first_name, last_name, role, status,
-            failed_login_attempts, locked_until
+            failed_login_attempts, locked_until, email_verified
      FROM users WHERE email = $1`,
     [email]
   );
@@ -85,6 +85,7 @@ export async function login(req: Request, res: Response) {
       firstName: user.first_name,
       lastName: user.last_name,
       role: user.role,
+      emailVerified: user.email_verified,
     },
   });
 }
@@ -269,4 +270,31 @@ export async function verifyEmail(req: Request, res: Response) {
     || (process.env.FRONTEND_URL ?? '').split(',')[0].trim();
 
   return res.redirect(`${frontendUrl}/login?verified=true`);
+}
+
+// ── POST /api/auth/resend-verification ─────────────────────────────────────────
+export async function resendVerification(req: Request, res: Response) {
+  const { email } = req.body;
+  if (!email || typeof email !== 'string') {
+    return res.status(400).json({ message: 'Email required' });
+  }
+
+  const result = await query(
+    `SELECT id, email, email_verified FROM users WHERE email = $1`,
+    [email]
+  );
+
+  const user = result.rows[0];
+  if (!user) {
+    // Don't reveal whether the email exists
+    return res.json({ message: 'If the email exists, a verification link has been sent.' });
+  }
+
+  if (user.email_verified) {
+    return res.json({ message: 'Email is already verified.' });
+  }
+
+  await sendVerificationEmail(user.id, user.email);
+
+  return res.json({ message: 'If the email exists, a verification link has been sent.' });
 }
