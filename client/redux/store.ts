@@ -3,6 +3,7 @@ import authReducer from "@/redux/slices/authSlice";
 import permissionsReducer from "@/redux/slices/permissionSlice";
 import usersReducer from "@/redux/slices/usersSlice";
 import auditReducer from "@/redux/slices/auditSlice";
+import agentReducer from "@/redux/slices/agentSlice";
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     permissions: permissionsReducer,
     users: usersReducer,
     audit: auditReducer,
+    agent: agentReducer,
   },
 });
 
