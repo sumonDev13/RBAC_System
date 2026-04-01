@@ -7,6 +7,7 @@ import { listAuditLogs } from '../services/audit.service';
 import { googleRedirect, googleCallback } from '../controllers/google_auth.controller';
 import { facebookCallback, facebookRedirect } from '../controllers/facebook_auth.controller';
 import { authRateLimiter } from '../middleware/rateLimiter';
+import { chat } from '../controllers/agent.controller';
 
 const router = Router();
 
@@ -41,5 +42,8 @@ router.put('/users/:id/permissions',     authenticate, requirePermission('permis
 
 // ── Audit log ─────────────────────────────────────────────────────────────────
 router.get('/audit', authenticate, requirePermission('audit.view'), listAuditLogs);
+
+// ── AI Agent (admin only) ─────────────────────────────────────────────────────
+router.post('/agent/chat', authenticate, requireRole('admin'), chat);
 
 export default router;
