@@ -17,23 +17,42 @@ export type AuditRow = {
 
 type AuditState = {
   items: AuditRow[];
+  total: number;
+  page: number;
   status: "idle" | "loading" | "error";
   error: string | null;
 };
 
 const initialState: AuditState = {
   items: [],
+  total: 0,
+  page: 1,
   status: "idle",
   error: null,
 };
 
-export const fetchAuditThunk = createAsyncThunk<AuditRow[], void, { rejectValue: string; state: RootState }>(
+export const fetchAuditThunk = createAsyncThunk<
+  { logs: AuditRow[]; total: number; page: number },
+  { page?: number; action?: string },
+  { rejectValue: string; state: RootState }
+>(
   "audit/fetch",
-  async (_payload, { rejectWithValue, getState }) => {
+  async (params, { rejectWithValue, getState }) => {
     try {
       const token = getState().auth.accessToken;
-      const res = await api.get("/audit", token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
-      return (res.data?.logs ?? []) as AuditRow[];
+      const res = await api.get("/audit", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        params: {
+          page: params.page || 1,
+          limit: 20,
+          action: params.action || undefined,
+        },
+      });
+      return {
+        logs: res.data?.logs ?? [],
+        total: res.data?.total ?? 0,
+        page: res.data?.page ?? 1,
+      };
     } catch (err: any) {
       return rejectWithValue(err?.response?.data?.message ?? "Failed to load audit logs");
     }
@@ -52,7 +71,9 @@ const auditSlice = createSlice({
       })
       .addCase(fetchAuditThunk.fulfilled, (state, action) => {
         state.status = "idle";
-        state.items = action.payload;
+        state.items = action.payload.logs;
+        state.total = action.payload.total;
+        state.page = action.payload.page;
       })
       .addCase(fetchAuditThunk.rejected, (state, action) => {
         state.status = "error";
@@ -62,4 +83,3 @@ const auditSlice = createSlice({
 });
 
 export default auditSlice.reducer;
-
