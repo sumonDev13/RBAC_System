@@ -1,24 +1,46 @@
 import { query } from '../db/pool';
 import { auditLog } from './audit.service';
-import fs from 'fs';
-import path from 'path';
-import { UPLOAD_DIR } from '../config/upload';
+import cloudinary from '../config/cloudinary';
 import { Request } from 'express';
 import { User } from '../interfaces';
+import stream from 'stream';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface PhotoRecord {
   id: string;
   user_id: string;
-  filename: string;
   original_name: string;
   mime_type: string;
   size_bytes: number;
+  cloudinary_url: string;
+  cloudinary_public_id: string;
   created_at: Date;
   owner_email?: string;
   owner_first_name?: string;
   owner_last_name?: string;
+}
+
+// ── Upload to Cloudinary ──────────────────────────────────────────────────────
+
+function uploadToCloudinary(buffer: Buffer, filename: string): Promise<{ url: string; public_id: string }> {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'rbac-photos',
+        public_id: filename,
+        resource_type: 'image',
+        overwrite: false,
+      },
+      (error, result) => {
+        if (error || !result) return reject(error || new Error('Upload failed'));
+        resolve({ url: result.secure_url, public_id: result.public_id });
+      },
+    );
+    const readable = new stream.PassThrough();
+    readable.end(buffer);
+    readable.pipe(uploadStream);
+  });
 }
 
 // ── Save photo metadata ───────────────────────────────────────────────────────
@@ -28,11 +50,16 @@ export async function savePhoto(
   file: Express.Multer.File,
   req: Request,
 ): Promise<PhotoRecord> {
+  const safeName = file.originalname.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const uniqueName = `${userId}_${safeName}_${Date.now()}`;
+
+  const { url, public_id } = await uploadToCloudinary(file.buffer, uniqueName);
+
   const result = await query<PhotoRecord>(
-    `INSERT INTO user_photos (user_id, filename, original_name, mime_type, size_bytes)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, user_id, filename, original_name, mime_type, size_bytes, created_at`,
-    [userId, file.filename, file.originalname, file.mimetype, file.size],
+    `INSERT INTO user_photos (user_id, original_name, mime_type, size_bytes, cloudinary_url, cloudinary_public_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, user_id, original_name, mime_type, size_bytes, cloudinary_url, cloudinary_public_id, created_at`,
+    [userId, file.originalname, file.mimetype, file.size, url, public_id],
   );
 
   const photo = result.rows[0];
@@ -40,7 +67,7 @@ export async function savePhoto(
     actorId: userId,
     targetId: userId,
     action: 'photo.uploaded',
-    metadata: { filename: file.originalname, size: file.size },
+    metadata: { filename: file.originalname, size: file.size, cloudinary_url: url },
     req,
   });
 
@@ -51,7 +78,7 @@ export async function savePhoto(
 
 export async function listUserPhotos(userId: string): Promise<PhotoRecord[]> {
   const result = await query<PhotoRecord>(
-    `SELECT id, user_id, filename, original_name, mime_type, size_bytes, created_at
+    `SELECT id, user_id, original_name, mime_type, size_bytes, cloudinary_url, cloudinary_public_id, created_at
      FROM user_photos
      WHERE user_id = $1
      ORDER BY created_at DESC`,
@@ -79,8 +106,8 @@ export async function listAllPhotos(
   params.push(limit);
   params.push(offset);
 
-  const result = await query<PhotoRecord & { owner_email: string; owner_first_name: string; owner_last_name: string }>(
-    `SELECT p.id, p.user_id, p.filename, p.original_name, p.mime_type, p.size_bytes, p.created_at,
+  const result = await query<PhotoRecord>(
+    `SELECT p.id, p.user_id, p.original_name, p.mime_type, p.size_bytes, p.cloudinary_url, p.cloudinary_public_id, p.created_at,
             u.email AS owner_email, u.first_name AS owner_first_name, u.last_name AS owner_last_name
      FROM user_photos p
      JOIN users u ON u.id = p.user_id
@@ -90,7 +117,6 @@ export async function listAllPhotos(
     params,
   );
 
-  // Count total
   const countParams: any[] = [];
   let countWhere = '';
   if (filterUserId) {
@@ -110,11 +136,11 @@ export async function listAllPhotos(
   };
 }
 
-// ── Get single photo (with ownership check) ───────────────────────────────────
+// ── Get single photo ──────────────────────────────────────────────────────────
 
 export async function getPhoto(photoId: string): Promise<PhotoRecord | null> {
   const result = await query<PhotoRecord>(
-    `SELECT id, user_id, filename, original_name, mime_type, size_bytes, created_at
+    `SELECT id, user_id, original_name, mime_type, size_bytes, cloudinary_url, cloudinary_public_id, created_at
      FROM user_photos WHERE id = $1`,
     [photoId],
   );
@@ -139,17 +165,15 @@ export async function deletePhoto(
     throw { status: 404, message: 'Photo not found' };
   }
 
-  // Only owner or admin can delete
   if (photo.user_id !== user.id && user.role !== 'admin') {
     throw { status: 403, message: 'Access denied' };
   }
 
-  // Delete file from disk
-  const filePath = path.join(UPLOAD_DIR, photo.filename);
+  // Delete from Cloudinary
   try {
-    fs.unlinkSync(filePath);
+    await cloudinary.uploader.destroy(photo.cloudinary_public_id);
   } catch {
-    // File may already be deleted, continue
+    // Continue even if Cloudinary delete fails
   }
 
   // Delete DB record
@@ -159,13 +183,7 @@ export async function deletePhoto(
     actorId: user.id,
     targetId: photo.user_id,
     action: 'photo.deleted',
-    metadata: { filename: photo.original_name },
+    metadata: { filename: photo.original_name, cloudinary_public_id: photo.cloudinary_public_id },
     req,
   });
-}
-
-// ── Get file path on disk ─────────────────────────────────────────────────────
-
-export function getFilePath(filename: string): string {
-  return path.join(UPLOAD_DIR, filename);
 }

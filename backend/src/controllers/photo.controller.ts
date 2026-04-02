@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import * as photoService from '../services/photo.service';
-import path from 'path';
 
 // ── POST /api/photos/upload ───────────────────────────────────────────────────
 export async function uploadPhotos(req: Request, res: Response) {
@@ -29,7 +28,7 @@ export async function listMyPhotos(req: Request, res: Response) {
   }
 }
 
-// ── GET /api/photos/:id ── preview/download a photo ───────────────────────────
+// ── GET /api/photos/:id ── get photo metadata + URL ───────────────────────────
 export async function getPhoto(req: Request, res: Response) {
   try {
     const id = String(req.params.id);
@@ -42,28 +41,14 @@ export async function getPhoto(req: Request, res: Response) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const filePath = photoService.getFilePath(photo.filename);
-    return res.sendFile(filePath);
-  } catch (err: any) {
-    return res.status(err.status || 500).json({ message: err.message });
-  }
-}
-
-// ── GET /api/photos/:id/download ── force download ────────────────────────────
-export async function downloadPhoto(req: Request, res: Response) {
-  try {
-    const id = String(req.params.id);
-    const photo = await photoService.getPhoto(id);
-    if (!photo) {
-      return res.status(404).json({ message: 'Photo not found' });
-    }
-
-    if (!photoService.canAccessPhoto(req.user!, photo)) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    const filePath = photoService.getFilePath(photo.filename);
-    return res.download(filePath, photo.original_name);
+    // Return the Cloudinary URL — frontend can use it directly
+    return res.json({
+      id: photo.id,
+      url: photo.cloudinary_url,
+      original_name: photo.original_name,
+      mime_type: photo.mime_type,
+      size_bytes: photo.size_bytes,
+    });
   } catch (err: any) {
     return res.status(err.status || 500).json({ message: err.message });
   }

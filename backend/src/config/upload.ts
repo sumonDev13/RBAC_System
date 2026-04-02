@@ -1,8 +1,5 @@
 import multer from 'multer';
-import path from 'path';
-import crypto from 'crypto';
 
-const UPLOAD_DIR = path.resolve(__dirname, '../../uploads');
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIMES = new Set([
   'image/jpeg',
@@ -12,14 +9,8 @@ const ALLOWED_MIMES = new Set([
   'image/svg+xml',
 ]);
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const name = crypto.randomUUID() + ext;
-    cb(null, name);
-  },
-});
+// Memory storage — files stay in buffer for Cloudinary upload
+const storage = multer.memoryStorage();
 
 export const upload = multer({
   storage,
@@ -32,5 +23,3 @@ export const upload = multer({
     }
   },
 });
-
-export { UPLOAD_DIR };

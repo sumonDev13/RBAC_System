@@ -6,10 +6,11 @@ import api from "@/lib/axios";
 export interface Photo {
   id: string;
   user_id: string;
-  filename: string;
   original_name: string;
   mime_type: string;
   size_bytes: number;
+  cloudinary_url: string;
+  cloudinary_public_id: string;
   created_at: string;
   owner_email?: string;
   owner_first_name?: string;

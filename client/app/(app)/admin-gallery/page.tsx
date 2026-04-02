@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import { useAppSelector } from "@/redux/hooks";
 import api from "@/lib/axios";
-import { AuthImage, AuthDownload } from "@/components/AuthImage";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface AdminPhoto {
   id: string;
   user_id: string;
-  filename: string;
   original_name: string;
   mime_type: string;
   size_bytes: number;
+  cloudinary_url: string;
+  cloudinary_public_id: string;
   created_at: string;
   owner_email: string;
   owner_first_name: string;
@@ -40,14 +40,11 @@ function formatDate(iso: string) {
 
 function AdminPreviewModal({
   photo,
-  token,
   onClose,
 }: {
   photo: AdminPhoto;
-  token: string;
   onClose: () => void;
 }) {
-  const base = api.defaults.baseURL;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -57,11 +54,10 @@ function AdminPreviewModal({
         className="relative max-h-[90vh] max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <AuthImage
-          photoId={photo.id}
-          token={token}
+        <img
+          src={photo.cloudinary_url}
           alt={photo.original_name}
-          className="max-h-[80vh] max-w-full rounded-lg object-contain"
+          className="max-h-[80vh] rounded-lg object-contain"
         />
         <div className="mt-2 rounded-lg bg-white/90 px-4 py-3">
           <div className="flex items-center justify-between">
@@ -73,14 +69,16 @@ function AdminPreviewModal({
               </div>
               <div className="text-xs text-zinc-400">{formatDate(photo.created_at)}</div>
             </div>
-            <AuthDownload
-              photoId={photo.id}
-              filename={photo.original_name}
-              token={token}
+            <a
+              href={photo.cloudinary_url}
+              download={photo.original_name}
+              target="_blank"
+              rel="noopener noreferrer"
               className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+              onClick={(e) => e.stopPropagation()}
             >
               Download
-            </AuthDownload>
+            </a>
           </div>
         </div>
         <button
@@ -184,9 +182,8 @@ export default function AdminGalleryPage() {
                 onClick={() => setPreview(photo)}
                 className="aspect-square w-full overflow-hidden"
               >
-                <AuthImage
-                  photoId={photo.id}
-                  token={token}
+                <img
+                  src={photo.cloudinary_url}
                   alt={photo.original_name}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
@@ -203,16 +200,19 @@ export default function AdminGalleryPage() {
                   <span className="text-[10px] text-zinc-400">
                     {formatSize(photo.size_bytes)}
                   </span>
-                  <AuthDownload
-                    photoId={photo.id}
-                    filename={photo.original_name}
-                    token={token}
+                  <a
+                    href={photo.cloudinary_url}
+                    download={photo.original_name}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="rounded p-0.5 text-zinc-400 hover:text-zinc-700"
+                    title="Download"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                  </AuthDownload>
+                  </a>
                 </div>
               </div>
             </div>
@@ -220,7 +220,6 @@ export default function AdminGalleryPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {total > 20 && (
         <div className="mt-6 flex items-center justify-center gap-2">
           <button
@@ -243,13 +242,8 @@ export default function AdminGalleryPage() {
         </div>
       )}
 
-      {/* Preview modal */}
       {preview && (
-        <AdminPreviewModal
-          photo={preview}
-          token={token}
-          onClose={() => setPreview(null)}
-        />
+        <AdminPreviewModal photo={preview} onClose={() => setPreview(null)} />
       )}
     </div>
   );

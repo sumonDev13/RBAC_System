@@ -109,7 +109,8 @@ CREATE TABLE IF NOT EXISTS session_blacklist (
 CREATE INDEX IF NOT EXISTS idx_session_blacklist_expires ON session_blacklist (expires_at);
 
 -- ── View: resolved_user_permissions ───────────────────────────────────────────
-CREATE OR REPLACE VIEW resolved_user_permissions AS
+DROP VIEW IF EXISTS resolved_user_permissions;
+CREATE VIEW resolved_user_permissions AS
 SELECT
   u.id AS user_id,
   p.id AS permission_id,

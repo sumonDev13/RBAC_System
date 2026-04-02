@@ -9,7 +9,7 @@ import { facebookCallback, facebookRedirect } from '../controllers/facebook_auth
 import { authRateLimiter } from '../middleware/rateLimiter';
 import { chat } from '../controllers/agent.controller';
 import { upload } from '../config/upload';
-import { uploadPhotos, listMyPhotos, getPhoto, downloadPhoto, deletePhoto, listAllPhotos } from '../controllers/photo.controller';
+import { uploadPhotos, listMyPhotos, getPhoto, deletePhoto, listAllPhotos } from '../controllers/photo.controller';
 
 const router = Router();
 
@@ -49,11 +49,10 @@ router.get('/audit', authenticate, requirePermission('audit.view'), listAuditLog
 router.post('/agent/chat', authenticate, requireRole('admin'), chat);
 
 // ── Photos (any authenticated user) ───────────────────────────────────────────
-router.post('/photos/upload',     authenticate, upload.array('photos', 5), uploadPhotos);
-router.get('/photos',             authenticate, listMyPhotos);
-router.get('/photos/:id',         authenticate, getPhoto);
-router.get('/photos/:id/download', authenticate, downloadPhoto);
-router.delete('/photos/:id',      authenticate, deletePhoto);
+router.post('/photos/upload',  authenticate, upload.array('photos', 5), uploadPhotos);
+router.get('/photos',          authenticate, listMyPhotos);
+router.get('/photos/:id',      authenticate, getPhoto);
+router.delete('/photos/:id',   authenticate, deletePhoto);
 
 // ── Admin: all photos ─────────────────────────────────────────────────────────
 router.get('/admin/photos',       authenticate, requireRole('admin'), listAllPhotos);

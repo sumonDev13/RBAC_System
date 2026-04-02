@@ -8,8 +8,6 @@ import {
   deletePhotoThunk,
   type Photo,
 } from "@/redux/slices/photosSlice";
-import api from "@/lib/axios";
-import { AuthImage, AuthDownload } from "@/components/AuthImage";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,25 +17,13 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 // ── Preview modal ─────────────────────────────────────────────────────────────
 
 function PreviewModal({
   photo,
-  token,
   onClose,
 }: {
   photo: Photo;
-  token: string;
   onClose: () => void;
 }) {
   return (
@@ -49,25 +35,26 @@ function PreviewModal({
         className="relative max-h-[90vh] max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <AuthImage
-          photoId={photo.id}
-          token={token}
+        <img
+          src={photo.cloudinary_url}
           alt={photo.original_name}
-          className="max-h-[85vh] max-w-full rounded-lg object-contain"
+          className="max-h-[85vh] rounded-lg object-contain"
         />
         <div className="mt-2 flex items-center justify-between rounded-lg bg-white/90 px-4 py-2">
           <div>
             <div className="text-sm font-medium text-zinc-800">{photo.original_name}</div>
             <div className="text-xs text-zinc-500">{formatSize(photo.size_bytes)}</div>
           </div>
-          <AuthDownload
-            photoId={photo.id}
-            filename={photo.original_name}
-            token={token}
+          <a
+            href={photo.cloudinary_url}
+            download={photo.original_name}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-800"
+            onClick={(e) => e.stopPropagation()}
           >
             Download
-          </AuthDownload>
+          </a>
         </div>
         <button
           onClick={onClose}
@@ -85,7 +72,6 @@ function PreviewModal({
 export default function GalleryPage() {
   const dispatch = useAppDispatch();
   const { items, loading, uploading } = useAppSelector((s) => s.photos);
-  const token = useAppSelector((s) => s.auth.accessToken) ?? "";
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<Photo | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -138,9 +124,7 @@ export default function GalleryPage() {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={`mb-6 rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
-          dragOver
-            ? "border-zinc-400 bg-zinc-50"
-            : "border-zinc-200 bg-white"
+          dragOver ? "border-zinc-400 bg-zinc-50" : "border-zinc-200 bg-white"
         }`}
       >
         <div className="text-sm text-zinc-500">
@@ -167,20 +151,17 @@ export default function GalleryPage() {
               key={photo.id}
               className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white"
             >
-              {/* Image */}
               <button
                 onClick={() => setPreview(photo)}
                 className="aspect-square w-full overflow-hidden"
               >
-                <AuthImage
-                  photoId={photo.id}
-                  token={token}
+                <img
+                  src={photo.cloudinary_url}
                   alt={photo.original_name}
                   className="h-full w-full object-cover transition-transform group-hover:scale-105"
                 />
               </button>
 
-              {/* Info bar */}
               <div className="flex items-center justify-between border-t border-zinc-100 px-3 py-2">
                 <div className="min-w-0">
                   <div className="truncate text-xs font-medium text-zinc-700">
@@ -209,13 +190,8 @@ export default function GalleryPage() {
         </div>
       )}
 
-      {/* Preview modal */}
       {preview && (
-        <PreviewModal
-          photo={preview}
-          token={token}
-          onClose={() => setPreview(null)}
-        />
+        <PreviewModal photo={preview} onClose={() => setPreview(null)} />
       )}
     </div>
   );

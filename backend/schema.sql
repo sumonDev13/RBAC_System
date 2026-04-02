@@ -135,13 +135,14 @@ CREATE INDEX IF NOT EXISTS idx_session_blacklist_expires ON session_blacklist (e
 
 -- ── Table: user_photos ────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_photos (
-  id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  filename      VARCHAR(255) NOT NULL,
-  original_name VARCHAR(255) NOT NULL,
-  mime_type     VARCHAR(100) NOT NULL,
-  size_bytes    INTEGER      NOT NULL,
-  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  id                   UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id              UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  original_name        VARCHAR(255) NOT NULL,
+  mime_type            VARCHAR(100) NOT NULL,
+  size_bytes           INTEGER      NOT NULL,
+  cloudinary_url       TEXT         NOT NULL,
+  cloudinary_public_id VARCHAR(255) NOT NULL,
+  created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_user_photos_user    ON user_photos (user_id);
